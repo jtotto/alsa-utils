@@ -20,6 +20,7 @@ jack_client_t *client;
 snd_seq_t *seq_handle;
 snd_seq_event_t outputEvent;
 int oportid;
+int iportid; // Only used in learn mode.
 
 // process callback data.
 int (*toggle_condition)(jack_default_audio_sample_t, jack_default_audio_sample_t);
@@ -131,10 +132,10 @@ int main (int argc, char *argv[])
 
     // Next, process command line arguments.
     int opt;
-    int channel = 0, param = 0, note = -1, argsFlag = 0;
+    int channel = 0, param = 0, note = -1, argsFlag = 0, learnFlag = 0;
     falling = 0.0f, rising = 0.0f;
 
-    while((opt = getopt(argc, argv, "f:r:c:p:n:")) != -1)
+    while((opt = getopt(argc, argv, "f:r:c:p:n:l")) != -1)
     {
         switch(opt)
         {
@@ -143,6 +144,7 @@ int main (int argc, char *argv[])
             case 'c': channel = atoi(optarg); break;
             case 'p': param = atoi(optarg); break;
             case 'n': note = atoi(optarg); break;
+            case 'l': learnFlag = 1; break;
         }
         argsFlag = 1;
     }
@@ -156,6 +158,8 @@ int main (int argc, char *argv[])
         printf( "-p: set the MIDI CC parameter on which to send (ON = 127, OFF = 0)\n" );
         printf( "-n: alternately, set the key on which to fire NOTE ON events (NO CORRESPONDING NOTE OFF MESSAGES WILL BE SENT!)\n" );
         printf( "    (if both are specified the -n setting will be used)\n" );
+        printf( "-l: 'learn' the MIDI NOTEON/CONTROLLER message to output from MIDI input\n" );
+        printf( "    (listens/outputs on -c channel)\n" );
 
         return 1;
     }
@@ -192,6 +196,17 @@ int main (int argc, char *argv[])
         exit(1);
     }
 
+    if( learnFlag ) 
+    {
+        if ((iportid = snd_seq_create_simple_port
+                (seq_handle, "Input",
+                SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE,
+                SND_SEQ_PORT_TYPE_APPLICATION)) < 0) {
+            printf("fatal error: could not open input port.\n");
+            exit(1);
+        }
+    }
+
     // These properties of the event don't change.
     snd_seq_ev_clear( &outputEvent );
     snd_seq_ev_set_source( &outputEvent, oportid );
@@ -211,7 +226,8 @@ int main (int argc, char *argv[])
     else
     {
         snd_seq_ev_set_controller( &outputEvent, channel, param, CONTROLLER_OFF); // Initialize event in the off position.
-        on_toggle = cc_action;
+                                                                                  // Will be fired in learn mode if nothing has been learned.
+        on_toggle = learnFlag ? basic_action : cc_action;
     }
 
     if( rising != 0.0f && falling != 0.0f )
@@ -235,7 +251,62 @@ int main (int argc, char *argv[])
     }
 
 
-    sleep (-1);
+    if( learnFlag )
+    {
+        // Begin polling for events to learn.
+        int npfd, bytesRemaining = 0;
+        struct pollfd *pfd;
+        snd_seq_event_t *inputEvent;
+
+        npfd = snd_seq_poll_descriptors_count(seq_handle, POLLIN);
+        pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
+        snd_seq_poll_descriptors(seq_handle, pfd, npfd, POLLIN);
+
+        #undef assignCommonEventMembers
+        #define assignEventMembers( outputEvent, inputEvent ) \
+        do {\
+        outputEvent.data = inputEvent->data; \
+        outputEvent.type = inputEvent->type; \
+        outputEvent.flags = inputEvent->flags; \
+        outputEvent.tag = inputEvent->tag; \
+        } while( 0 ) 
+
+        while (1)
+        {
+            if (poll(pfd, npfd, 1000000) > 0)
+            {
+                do
+                {
+                    bytesRemaining = snd_seq_event_input(seq_handle, &inputEvent);
+
+                    switch( inputEvent->type )
+                    {
+                        case SND_SEQ_EVENT_NOTEON:
+                            {
+                                if( inputEvent->data.note.channel == channel )
+                                {
+                                    assignEventMembers( outputEvent, inputEvent );
+                                }
+                            }
+                            break;
+                        case SND_SEQ_EVENT_CONTROLLER:
+                            {
+                                if( inputEvent->data.control.channel == channel )
+                                {
+                                    assignEventMembers( outputEvent, inputEvent );
+                                }
+                            }
+                            break;
+                    }
+                }
+                while (bytesRemaining > 0);
+            }
+        }
+    }
+    else
+    {
+        sleep (-1);
+    }
 
     /* this is never reached but if the program
        had some other way to exit besides being killed,
