@@ -279,7 +279,7 @@ int main (int argc, char *argv[])
         pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
         snd_seq_poll_descriptors(seq_handle, pfd, npfd, POLLIN);
 
-        #undef assignCommonEventMembers
+        #undef assignEventMembers
         #define assignEventMembers( outputEvent, inputEvent ) \
         do {\
         outputEvent.data = inputEvent->data; \
