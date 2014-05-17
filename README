@@ -1,30 +1,12 @@
 cc_toggler.c:
 
-I found myself in a situation where I wanted a MIDI toggle switch, but only
-had a continuous controller (specifically, my phone running my JAME app, see
-the JAME repo if that sounds like a cool thing to you).  I decided to learn
-the basics of ALSA MIDI input and created this, which does exactly what I 
-needed it to and nothing more.
-
+I found myself in a situation where I wanted a MIDI toggle switch, but only had a continuous controller (specifically, my phone running my JAME app, see the JAME repo if that sounds like a cool thing to you).  I decided to learn the basics of ALSA MIDI input and created this, which does exactly what I  needed it to and nothing more. 
 ---------------------------------------------------------------------------
 
 amplitude_toggler.c:
 
-I had a 'sustain pedal' that worked with an old keyboard that I
-had laying around.  It's not MIDI-capable - instead, depressing the pedal simply
-grounds the line.  It has a quarter-inch standard instrument jack connection,
-so I decided to hack together a 1/4-1/8 inch adapter, plug it into my microphone
-jack and see what happened.  I plotted the raw PCM samples with GNUPlot as I played
-with the pedal, and found that closing the switch caused a downward spike to -0.15
-(whatever units of amplitude JACK samples are in, hah) and opening caused an 
-upward spike of the same magnitude.  
+I had a 'sustain pedal' that worked with an old keyboard that I had laying around.  It's not MIDI-capable - instead, depressing the pedal simply grounds the line.  It has a quarter-inch standard instrument jack connection, so I decided to hack together a 1/4-1/8 inch adapter, plug it into my microphone jack and see what happened.  I plotted the raw PCM samples with GNUPlot as I played with the pedal, and found that closing the switch caused a downward spike to -0.15 (whatever units of amplitude JACK samples are in, hah) and opening caused an  upward spike of the same magnitude.   
 
-This program listens on its input port for upward and downward spikes like the ones
-my pedal produces and generates MIDI messages in real time when they occur.  The
-message can be fixed as a command-line argument or (more usefully for me) can be
-learned from the most recent MIDI message read from its MIDI input.
+This program listens on its input port for upward and downward spikes like the ones my pedal produces and generates MIDI messages in real time when they occur.  The message can be fixed as a command-line argument or (more usefully for me) can be learned from the most recent MIDI message read from its MIDI input. 
 
-I use it for looping - I map a different key on my keyboard to each loop in sooper
-looper, start recording with that key, and then stop recording using my footswitch
-(which will send a message ending recording for whichever loop was most recently 
-started).
+I use it for looping - I map a different key on my keyboard to each loop in sooper looper, start recording with that key, and then stop recording using my footswitch (which will send a message ending recording for whichever loop was most recently  started). 
